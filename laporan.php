@@ -24,10 +24,6 @@ function tambahLaporan($id_user, $laporan_text, $laporan_pdf, $status, $tipe_lap
         echo 'Kesalahan fwrite(): ',  $e->getMessage(), "\n";
     }
     fclose($filehandler);
-    // $outputfile = "pdf/".generateRandomFileName('foto_', '.jpg') ;
-    //     $filehandler = fopen($outputfile, 'wb' ); 
-    //     fwrite($filehandler, base64_decode($laporan_pdf));
-    //     fclose($filehandler); 
     
     
     $sql = "INSERT INTO tb_laporan (id_user, laporan_text, laporan_pdf, status, tipe_laporan) VALUES ('$id_user', '$laporan_text', '$outputfile', '$status', '$tipe_laporan')";
