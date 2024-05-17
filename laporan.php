@@ -48,6 +48,20 @@ function semuaLaporan() {
     return $laporan;
 }
 
+
+function laporanUser($id) {
+    global $conn;
+    $sql = "SELECT * FROM tb_laporan Where id_user=$id";
+    $result = $conn->query($sql);
+    $laporan = array();
+    if ($result->num_rows > 0) {
+        while($row = $result->fetch_assoc()) {
+            $laporan[] = $row;
+        }
+    }
+    return $laporan;
+}
+
 function ubahLaporan($id, $laporan_text, $laporan_pdf, $status, $tipe_laporan) {
     global $conn;
     
@@ -79,13 +93,37 @@ function ubahLaporan($id, $laporan_text, $laporan_pdf, $status, $tipe_laporan) {
 
 function hapusLaporan($id) {
     global $conn;
-    $sql = "DELETE FROM tb_laporan WHERE id_laporan=$id";
-    if ($conn->query($sql) === TRUE) {
-        return true;
+
+    // Mendapatkan nama file PDF dari database
+    $sql = "SELECT laporan_pdf FROM tb_laporan WHERE id_laporan = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $file_path = $row['laporan_pdf'];
+
+        // Menghapus file dari sistem file
+        if (file_exists($file_path)) {
+            unlink($file_path);
+        }
+
+        // Menghapus data laporan dari database
+        $sql_delete = "DELETE FROM tb_laporan WHERE id_laporan = ?";
+        $stmt_delete = $conn->prepare($sql_delete);
+        $stmt_delete->bind_param("i", $id);
+        if ($stmt_delete->execute()) {
+            return true;
+        } else {
+            return false;
+        }
     } else {
         return false;
     }
 }
+
 
 $request_method = $_SERVER["REQUEST_METHOD"];
 
@@ -97,6 +135,13 @@ switch($request_method) {
                 echo json_encode(array("sukses" => true, "status" => 200, "pesan" => "Data berhasil Dihapus"));
             } else {
                 echo json_encode(array("sukses" => false, "status" => 500, "pesan" => "Gagal Menghapus Data"));
+            }
+        } else if(isset($_GET['id'])) {
+            $id = $_GET["id"];
+            if (laporanUser($id)) {
+                echo json_encode(array("sukses" => true, "status" => 200, "pesan" => "Berhasil Mendapatkan Semua Laporan", "data" => laporanUser($id)));
+            } else {
+                echo json_encode(array("sukses" => false, "status" => 500, "pesan" => "Data Tidak Ditemukan"));
             }
         } else {
             echo json_encode(array("sukses" => true, "status" => 200, "pesan" => "Berhasil Mendapatkan Semua Laporan", "data" => semuaLaporan()));
