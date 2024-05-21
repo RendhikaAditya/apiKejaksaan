@@ -89,7 +89,6 @@ function createUser($nama, $email, $no_telpon, $ktp_base64, $alamat, $password, 
 
 
 
-
 function updateUser($id, $nama, $email, $no_telpon, $ktp_base64, $alamat, $password, $level) {
     global $conn;
 
@@ -101,22 +100,39 @@ function updateUser($id, $nama, $email, $no_telpon, $ktp_base64, $alamat, $passw
         $old_ktp_file = $row['ktp'];
         $old_password = $row['password'];
 
-        // Generate the new file name for the KTP PDF
-        $new_ktp_file_name = "pdf/".generateRandomFileName('ktp_', '.pdf');
+        // Use the old KTP file name if it exists, else generate a new one
+        $new_ktp_file_name = !empty($old_ktp_file) ? $old_ktp_file : "pdf/".generateRandomFileName('ktp_', '.pdf');
+
+        // Write the base64 decoded PDF content to the file
         $filehandler = fopen($new_ktp_file_name, 'wb');
+        if (!$filehandler) {
+            echo 'Failed to open file for writing';
+            return false;
+        }
         try {
-            // Write the base64 decoded PDF content to the new file
-            fwrite($filehandler, base64_decode($ktp_base64));
+            // Decode and write the base64 content to the file
+            $decoded_content = base64_decode($ktp_base64);
+            if ($decoded_content === false) {
+                echo 'Failed to decode base64 content';
+                fclose($filehandler);
+                return false;
+            }
+            $bytes_written = fwrite($filehandler, $decoded_content);
+            if ($bytes_written === false) {
+                echo 'Failed to write to file';
+                fclose($filehandler);
+                return false;
+            }
         } catch (Exception $e) {
-            echo 'Kesalahan fwrite(): ',  $e->getMessage(), "\n";
+            echo 'Error in fwrite(): ',  $e->getMessage(), "\n";
+            fclose($filehandler);
             return false;
         }
         fclose($filehandler);
 
         // Check if password is provided and not empty
-        if(!empty($password)) {
+        if (!empty($password)) {
             $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-
             $password_update = ", password='$hashed_password'";
         } else {
             $password_update = "";
@@ -132,14 +148,12 @@ function updateUser($id, $nama, $email, $no_telpon, $ktp_base64, $alamat, $passw
                 $password_update, 
                 level='$level' 
                 WHERE id_user=$id";
-        
+
         if ($conn->query($sql)) {
-            // Delete the old KTP file
-            deleteFile($old_ktp_file);
-            return true;
+            // Return the new or existing file name
+            return $new_ktp_file_name;
         } else {
-            // Remove the newly created file if update failed
-            deleteFile($new_ktp_file_name);
+            echo 'Failed to update user in the database';
             return false;
         }
     } else {
@@ -147,6 +161,8 @@ function updateUser($id, $nama, $email, $no_telpon, $ktp_base64, $alamat, $passw
         return false;
     }
 }
+
+
 
 function deleteFile($filePath) {
     if (file_exists($filePath)) {
@@ -207,7 +223,7 @@ switch ($request_method) {
                 if (isset($_GET["id_user"])) {
                     $id = $_GET["id_user"];
                     if (updateUser($id, $nama, $email, $no_telpon, $ktp, $alamat, $password, $level)) {
-                        echo json_encode(array("sukses" => true, "status" => 200, "pesan" => "Data berhasil diubah"));
+                        echo json_encode(array("sukses" => true, "status" => 200, "pesan" => "Berhasil merubah data"));
                     } else {
                         echo json_encode(array("sukses" => false, "status" => 500, "pesan" => "Gagal mengubah data"));
                     }
